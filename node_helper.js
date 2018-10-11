@@ -9,7 +9,7 @@ module.exports = NodeHelper.create({
  	python_start: function () {
 		const self = this;
 //    		const pyshell = new PythonShell('modules/' + this.name + '/camera_publisher/image_webcam_broadcaster.py', { mode: 'json', args: [JSON.stringify(this.config)]});
-    		const pyshell = new PythonShell('modules/' + this.name + '/camera_publisher/image_realsense_broadcaster.py', {pythonPath: 'python3', mode: 'json', args: [JSON.stringify(this.config)]});
+    		const pyshell = new PythonShell('modules/' + this.name + '/camera_publisher/image_realsense_broadcaster_cplusplus.py', {pythonPath: 'python3', mode: 'json', args: [JSON.stringify(this.config)]});
 
     		pyshell.on('message', function (message) {
 			try {

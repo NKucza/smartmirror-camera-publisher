@@ -19,7 +19,7 @@ depth_fps = 30.
 depth_frame_width = 1280
 depth_frame_height = 720
 
-DISTANCE_TO_FACE = 70
+DISTANCE_TO_FACE = 40
 
 if os.path.exists("/tmp/camera_image") is True:
 	os.remove("/tmp/camera_image")
