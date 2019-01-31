@@ -12,7 +12,7 @@ int const COLOR_INPUT_WIDTH      = 1920;
 int const COLOR_INPUT_HEIGHT     = 1080;
 int const DEPTH_INPUT_WIDTH      = 1280;
 int const DEPTH_INPUT_HEIGHT     = 720;
-int const FRAMERATE       		 = 30;
+int const FRAMERATE       	 = 30;
 
 // Named windows
 //char* const WINDOW_DEPTH = "Depth Image";
@@ -22,7 +22,7 @@ int const FRAMERATE       		 = 30;
 
 //Define the gstreamer sink
 char* const gst_str_image = "appsrc ! shmsink socket-path=/tmp/camera_image sync=false wait-for-connection=false shm-size=1000000000";
-//gst_str_depth = "appsrc ! shmsink socket-path=/tmp/camera_depth sync=true wait-for-connection=false shm-size=1000000000"
+char* const gst_str_depth = "appsrc ! shmsink socket-path=/tmp/camera_depth sync=true wait-for-connection=false shm-size=1000000000";
 char* const gst_str_image_1m = "appsrc ! shmsink socket-path=/tmp/camera_1m sync=false wait-for-connection=false shm-size=1000000000";
 
 //void render_slider(rect location, float& clipping_dist);
@@ -37,79 +37,83 @@ int main(int argc, char * argv[]) try
 
 	auto out_image 		= cv::VideoWriter(gst_str_image, 0, FRAMERATE, cv::Size(COLOR_INPUT_WIDTH, COLOR_INPUT_HEIGHT), true);
 	auto out_image_1m 	= cv::VideoWriter(gst_str_image_1m, 0, FRAMERATE, cv::Size(COLOR_INPUT_WIDTH, COLOR_INPUT_HEIGHT), true);
+	auto out_depth_image 	= cv::VideoWriter(gst_str_depth, 0, FRAMERATE, cv::Size(COLOR_INPUT_WIDTH, COLOR_INPUT_HEIGHT), false);
 
 	//std::cout << "main started .. " << std::endl;
 	// Create a pipeline to easily configure and start the camera
-    rs2::pipeline pipe;
+	rs2::pipeline pipe;
 
 	//std::cout << "pipeline created .. " << std::endl;
 
 	rs2::config cfg;
 
-	cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_INPUT_WIDTH, DEPTH_INPUT_HEIGHT, RS2_FORMAT_Z16);
+	cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_INPUT_WIDTH, DEPTH_INPUT_HEIGHT, RS2_FORMAT_Z16, FRAMERATE);
 	cfg.enable_stream(RS2_STREAM_COLOR, COLOR_INPUT_WIDTH, COLOR_INPUT_HEIGHT, RS2_FORMAT_BGR8, FRAMERATE);
 
 	//std::cout << "config created .. " << std::endl;
 
-    //Calling pipeline's start() without any additional parameters will start the first device
-    // with its default streams.
-    //The start function returns the pipeline profile which the pipeline used to start the device
-    rs2::pipeline_profile profile = pipe.start(cfg);
+	//Calling pipeline's start() without any additional parameters will start the first device
+	// with its default streams.
+	//The start function returns the pipeline profile which the pipeline used to start the device
+	rs2::pipeline_profile profile = pipe.start(cfg);
 
 	//std::cout << "pipeline started .. " << std::endl;
 
-    // Each depth camera might have different units for depth pixels, so we get it here
-    // Using the pipeline's profile, we can retrieve the device that the pipeline uses
-    float depth_scale = get_depth_scale(profile.get_device());
+	// Each depth camera might have different units for depth pixels, so we get it here
+	// Using the pipeline's profile, we can retrieve the device that the pipeline uses
+	float depth_scale = get_depth_scale(profile.get_device());
 
 	//std::cout << ("depth scale = %d",depth_scale) << std::endl;
 
-    //Pipeline could choose a device that does not have a color stream
-    //If there is no color stream, choose to align depth to another stream
-    rs2_stream align_to = find_stream_to_align(profile.get_streams());
+	//Pipeline could choose a device that does not have a color stream
+	//If there is no color stream, choose to align depth to another stream
+	rs2_stream align_to = find_stream_to_align(profile.get_streams());
 
-    // Create a rs2::align object.
-    // rs2::align allows us to perform alignment of depth frames to others frames
-    //The "align_to" is the stream type to which we plan to align depth frames.
-    rs2::align align(align_to);
+	// Create a rs2::align object.
+	// rs2::align allows us to perform alignment of depth frames to others frames
+	//The "align_to" is the stream type to which we plan to align depth frames.
+	rs2::align align(align_to);
 
-    // Define a variable for controlling the distance to clip
-    float depth_clipping_distance = 1.f;
+	// Define a variable for controlling the distance to clip
+	float depth_clipping_distance = 1.f;
 
 	//std::cout << "creating opencv windows.." << std::endl;
 
 	//cv::namedWindow( WINDOW_DEPTH, 0 );
 	//cv::namedWindow( WINDOW_FILTERED_DEPTH, 0 );
-    //cv::namedWindow( WINDOW_RGB, 0 );
+	//cv::namedWindow( WINDOW_RGB, 0 );
 	//cv::namedWindow( WINDOW_BACK_RGB, 0 );
 
 	cv::UMat disToFaceMat(1920,1080,CV_8UC1,char(42));
 
 	while (true){
 		// Using the align object, we block the application until a frameset is available
-        rs2::frameset frameset = pipe.wait_for_frames();
+		rs2::frameset frameset = pipe.wait_for_frames();
 
 		//Get processed aligned frame
-        auto processed = align.process(frameset);
+		auto processed = align.process(frameset);
 
-	    rs2::frame depth = processed.get_depth_frame(); // Find and colorize the depth data
-        rs2::frame color = processed.get_color_frame(); // Find the color data
+		rs2::frame depth = processed.get_depth_frame(); // Find and colorize the depth data
+		rs2::frame color = processed.get_color_frame(); // Find the color data
 
 		// Create depth image
 		cv::UMat depth8u;
-        cv::Mat depth16( COLOR_INPUT_HEIGHT, COLOR_INPUT_WIDTH, CV_16U,(uchar *) depth.get_data());
-       	cv::convertScaleAbs(depth16,depth8u, 0.03);
+		cv::Mat depth16( COLOR_INPUT_HEIGHT, COLOR_INPUT_WIDTH, CV_16U,(uchar *) depth.get_data());
+		cv::convertScaleAbs(depth16,depth8u, 0.03);
 
 		cv::UMat rgb_image;        
 		// Create color image
-        cv::Mat rgb( COLOR_INPUT_HEIGHT, COLOR_INPUT_WIDTH, CV_8UC3, (uchar *) color.get_data());
+		cv::Mat rgb( COLOR_INPUT_HEIGHT, COLOR_INPUT_WIDTH, CV_8UC3, (uchar *) color.get_data());
 		rgb.copyTo(rgb_image);
 		
 		transpose(rgb_image, rgb_image);
 		transpose(depth8u, depth8u);
 
+		out_depth_image.write(depth8u.getMat(cv::ACCESS_READ));
+
 		cv::UMat depth8u_blur;
-		threshold(depth8u,depth8u_blur,double(39000*depth_scale),255,THRESH_TOZERO_INV);
+		threshold(depth8u,depth8u_blur,double(80000*depth_scale),255,THRESH_TOZERO_INV);
+		//threshold(depth8u,depth8u_blur,double(42000*depth_scale),255,THRESH_TOZERO_INV);
 		cv::medianBlur(depth8u_blur, depth8u_blur, 49);
 		cv::GaussianBlur(depth8u_blur, depth8u_blur, cv::Size(49,49),0);
 		threshold(depth8u_blur,depth8u_blur,double(5),1,THRESH_BINARY);
@@ -125,7 +129,7 @@ int main(int argc, char * argv[]) try
 		out_image.write(rgb_image.getMat(cv::ACCESS_READ));
 		out_image_1m.write(rgb_back_image.getMat(cv::ACCESS_READ));
 
-		cvWaitKey( 1 );
+		//cvWaitKey( 1 );
 	}
 
     return EXIT_SUCCESS;

@@ -23,5 +23,6 @@ add_executable(camera_publisher main.cpp)
 target_link_libraries(camera_publisher
   ${OpenCV_LIBRARIES}
   ${RS_LIBRARIES}
+  pthread
 )
 
