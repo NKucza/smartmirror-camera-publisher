@@ -17,13 +17,13 @@ int const FRAMERATE       	 = 30;
 // Named windows
 //char* const WINDOW_DEPTH = "Depth Image";
 //char* const WINDOW_FILTERED_DEPTH = "Filtered Depth Image";
-//char* const WINDOW_RGB     = "RGB Image";
+char* const WINDOW_RGB     = "RGB Image";
 //char* const WINDOW_BACK_RGB     = "Background RGB Image";
 
 //Define the gstreamer sink
-char* const gst_str_image = "appsrc ! shmsink socket-path=/tmp/camera_image sync=false wait-for-connection=false shm-size=1000000000";
-char* const gst_str_depth = "appsrc ! shmsink socket-path=/tmp/camera_depth sync=true wait-for-connection=false shm-size=1000000000";
-char* const gst_str_image_1m = "appsrc ! shmsink socket-path=/tmp/camera_1m sync=false wait-for-connection=false shm-size=1000000000";
+char* const gst_str_image = "appsrc ! shmsink socket-path=/tmp/camera_image sync=false wait-for-connection=false shm-size=3000000000";
+char* const gst_str_depth = "appsrc ! shmsink socket-path=/tmp/camera_depth sync=true wait-for-connection=false shm-size=3000000000";
+char* const gst_str_image_1m = "appsrc ! shmsink socket-path=/tmp/camera_1m sync=false wait-for-connection=false shm-size=3000000000";
 
 //void render_slider(rect location, float& clipping_dist);
 float get_depth_scale(rs2::device dev);
@@ -81,10 +81,10 @@ int main(int argc, char * argv[]) try
 
 	//cv::namedWindow( WINDOW_DEPTH, 0 );
 	//cv::namedWindow( WINDOW_FILTERED_DEPTH, 0 );
-	//cv::namedWindow( WINDOW_RGB, 0 );
+	cv::namedWindow( WINDOW_RGB, 0 );
 	//cv::namedWindow( WINDOW_BACK_RGB, 0 );
 
-	cv::UMat disToFaceMat(1920,1080,CV_8UC1,char(42));
+	cv::UMat disToFaceMat(1920,1080,CV_8UC1,char(20));
 
 	while (true){
 		// Using the align object, we block the application until a frameset is available
@@ -108,11 +108,15 @@ int main(int argc, char * argv[]) try
 		
 		transpose(rgb_image, rgb_image);
 		transpose(depth8u, depth8u);
+		
+		flip(rgb_image, rgb_image,-1);
+		flip(depth8u, depth8u,-1);
+
 
 		out_depth_image.write(depth8u.getMat(cv::ACCESS_READ));
 
 		cv::UMat depth8u_blur;
-		threshold(depth8u,depth8u_blur,double(80000*depth_scale),255,THRESH_TOZERO_INV);
+		threshold(depth8u,depth8u_blur,double(48000*depth_scale),255,THRESH_TOZERO_INV);
 		//threshold(depth8u,depth8u_blur,double(42000*depth_scale),255,THRESH_TOZERO_INV);
 		cv::medianBlur(depth8u_blur, depth8u_blur, 49);
 		cv::GaussianBlur(depth8u_blur, depth8u_blur, cv::Size(49,49),0);
@@ -124,12 +128,12 @@ int main(int argc, char * argv[]) try
 
 		rgb_back_image = rgb_image.mul(depth8u_blur);
 
-		//imshow( WINDOW_RGB, rgb_image );
+		imshow( WINDOW_RGB, rgb_image );
 		//imshow( WINDOW_BACK_RGB, rgb_back_image );
 		out_image.write(rgb_image.getMat(cv::ACCESS_READ));
 		out_image_1m.write(rgb_back_image.getMat(cv::ACCESS_READ));
 
-		//cvWaitKey( 1 );
+		cvWaitKey( 1 );
 	}
 
     return EXIT_SUCCESS;
