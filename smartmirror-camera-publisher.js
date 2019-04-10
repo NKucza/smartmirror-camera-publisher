@@ -1,3 +1,13 @@
+/**
+ * @file smartmirror-camera-publisher.js
+ *
+ * @author nkucza
+ * @license MIT
+ *
+ * @see  https://github.com/NKucza/smartmirror-camera-publisher
+ */
+
+
 Module.register('smartmirror-camera-publisher',{
 
 	defaults: {
