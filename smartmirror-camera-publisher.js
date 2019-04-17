@@ -1,12 +1,11 @@
-/* global Module */
-
-/* Magic Mirror
- * Module: MMM-Facial-Recognition
+/**
+ * @file smartmirror-camera-publisher.js
  *
- * By Paul-Vincent Roll http://paulvincentroll.com
- * MIT Licensed.
+ * @author nkucza
+ * @license MIT
+ *
+ * @see  https://github.com/NKucza/smartmirror-camera-publisher
  */
-
 
 
 Module.register('smartmirror-camera-publisher',{
