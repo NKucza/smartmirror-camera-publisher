@@ -15,15 +15,15 @@ int const DEPTH_INPUT_HEIGHT     = 720;
 int const FRAMERATE       	 = 30;
 
 // Named windows
-//char* const WINDOW_DEPTH = "Depth Image";
-//char* const WINDOW_FILTERED_DEPTH = "Filtered Depth Image";
+char* const WINDOW_DEPTH = "Depth Image";
+char* const WINDOW_FILTERED_DEPTH = "Filtered Depth Image";
 char* const WINDOW_RGB     = "RGB Image";
-//char* const WINDOW_BACK_RGB     = "Background RGB Image";
+char* const WINDOW_BACK_RGB     = "Background RGB Image";
 
 //Define the gstreamer sink
-char* const gst_str_image = "appsrc ! shmsink socket-path=/tmp/camera_image sync=false wait-for-connection=false shm-size=3000000000";
-char* const gst_str_depth = "appsrc ! shmsink socket-path=/tmp/camera_depth sync=true wait-for-connection=false shm-size=3000000000";
-char* const gst_str_image_1m = "appsrc ! shmsink socket-path=/tmp/camera_1m sync=false wait-for-connection=false shm-size=3000000000";
+char* const gst_str_image = "appsrc ! shmsink socket-path=/tmp/camera_image sync=false wait-for-connection=false shm-size=200000000";
+char* const gst_str_depth = "appsrc ! shmsink socket-path=/tmp/camera_depth sync=true wait-for-connection=false shm-size=200000000";
+char* const gst_str_image_1m = "appsrc ! shmsink socket-path=/tmp/camera_1m sync=false wait-for-connection=false shm-size=200000000";
 
 //void render_slider(rect location, float& clipping_dist);
 float get_depth_scale(rs2::device dev);
@@ -81,10 +81,25 @@ int main(int argc, char * argv[]) try
 
 	//cv::namedWindow( WINDOW_DEPTH, 0 );
 	//cv::namedWindow( WINDOW_FILTERED_DEPTH, 0 );
-	cv::namedWindow( WINDOW_RGB, 0 );
+	//cv::namedWindow( WINDOW_RGB, 0 );
 	//cv::namedWindow( WINDOW_BACK_RGB, 0 );
 
-	cv::UMat disToFaceMat(1920,1080,CV_8UC1,char(20));
+	//cuda::GpuMat disToFaceMat(1920,1080,CV_8UC1,char(20));
+
+
+	cv::cuda::GpuMat depth_image, depth_image_fliped, depth_image_rotated;
+	cv::cuda::GpuMat rgb_image,rgb_image_fliped,rgb_image_rotated;	
+	cv::Mat depth8u;	
+
+	
+	cuda::GpuMat depth_thresh,depth8u_medianBlur,depth8u_medianBlur_Thresh, depth8u_gausBlur, depth8u_gausBlur_Thresh;
+
+	Mat rgb_image_out;
+	Mat depth_image_out;
+	Mat rgb_back_image_out;
+
+	Ptr<cuda::Filter> median = cuda::createMedianFilter(depth8u_medianBlur.type(), 7);
+	Ptr<cuda::Filter> gaussian = cuda::createGaussianFilter(depth8u_medianBlur.type(),depth8u_gausBlur.type(), Size(31,31),0);
 
 	while (true){
 		// Using the align object, we block the application until a frameset is available
@@ -97,43 +112,62 @@ int main(int argc, char * argv[]) try
 		rs2::frame color = processed.get_color_frame(); // Find the color data
 
 		// Create depth image
-		cv::UMat depth8u;
+		 
 		cv::Mat depth16( COLOR_INPUT_HEIGHT, COLOR_INPUT_WIDTH, CV_16U,(uchar *) depth.get_data());
 		cv::convertScaleAbs(depth16,depth8u, 0.03);
+		depth_image.upload(depth8u);
 
-		cv::UMat rgb_image;        
+		     
 		// Create color image
+	
 		cv::Mat rgb( COLOR_INPUT_HEIGHT, COLOR_INPUT_WIDTH, CV_8UC3, (uchar *) color.get_data());
-		rgb.copyTo(rgb_image);
+		rgb_image.upload(rgb);
 		
-		transpose(rgb_image, rgb_image);
-		transpose(depth8u, depth8u);
+
+		cuda::flip(rgb_image, rgb_image_fliped,0);
+		cuda::flip(depth_image, depth_image_fliped,0);
+
+		cuda::rotate(rgb_image_fliped, rgb_image_rotated,Size(1080,1920),90.0,0,1920);
+		cuda::rotate(depth_image_fliped, depth_image_rotated,Size(1080,1920),90.0,0,1920);
+
 		
-		flip(rgb_image, rgb_image,-1);
-		flip(depth8u, depth8u,-1);
+
+		cuda::threshold(depth_image_rotated,depth_thresh,double(42000*depth_scale),255,THRESH_TOZERO_INV);
+		
+
+		//median->apply(depth_thresh, depth8u_medianBlur);
+		//cuda::threshold(depth8u_medianBlur,depth8u_medianBlur_Thresh,double(48000*depth_scale),255,THRESH_TOZERO_INV);
+		//gaussian->apply(depth8u_medianBlur_Thresh, depth8u_gausBlur);
+		gaussian->apply(depth_thresh, depth8u_gausBlur);	
+		cuda::threshold(depth8u_gausBlur,depth8u_gausBlur_Thresh,double(5),1,THRESH_BINARY);
 
 
-		out_depth_image.write(depth8u.getMat(cv::ACCESS_READ));
+		cuda::GpuMat rgb_back_image;
+		rgb_image_rotated.copyTo(rgb_back_image,depth8u_gausBlur_Thresh);
+		
+		
+		rgb_image_rotated.download(rgb_image_out);
 
-		cv::UMat depth8u_blur;
-		threshold(depth8u,depth8u_blur,double(48000*depth_scale),255,THRESH_TOZERO_INV);
-		//threshold(depth8u,depth8u_blur,double(42000*depth_scale),255,THRESH_TOZERO_INV);
-		cv::medianBlur(depth8u_blur, depth8u_blur, 49);
-		cv::GaussianBlur(depth8u_blur, depth8u_blur, cv::Size(49,49),0);
-		threshold(depth8u_blur,depth8u_blur,double(5),1,THRESH_BINARY);
+		depth_image_rotated.download(depth_image_out);
+		//Mat filterd_depth_image_out;
+		//depth8u_gausBlur_Thresh.download(filterd_depth_image_out);
 
-		cv::UMat rgb_back_image;
+		rgb_back_image.download(rgb_back_image_out);
 
-		cv::cvtColor(depth8u_blur, depth8u_blur, cv::COLOR_GRAY2BGR);
 
-		rgb_back_image = rgb_image.mul(depth8u_blur);
+		//imshow( WINDOW_RGB, rgb_image_out );
+		//imshow( WINDOW_DEPTH, depth_image_out );
+		//imshow( WINDOW_FILTERED_DEPTH, filterd_depth_image_out );
+		//imshow( WINDOW_BACK_RGB, rgb_back_image_out );
 
-		imshow( WINDOW_RGB, rgb_image );
-		//imshow( WINDOW_BACK_RGB, rgb_back_image );
-		out_image.write(rgb_image.getMat(cv::ACCESS_READ));
-		out_image_1m.write(rgb_back_image.getMat(cv::ACCESS_READ));
+		out_image.write(rgb_image_out);
+		out_image_1m.write(rgb_back_image_out);
+		out_depth_image.write(depth_image_out);
 
-		cvWaitKey( 1 );
+		// out_image.write(rgb_image.getMat(cv::ACCESS_READ));
+		// out_image_1m.write(rgb_back_image.getMat(cv::ACCESS_READ));
+
+		//cvWaitKey( 1 );
 	}
 
     return EXIT_SUCCESS;
