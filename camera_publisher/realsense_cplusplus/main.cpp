@@ -49,6 +49,22 @@ int main(int argc, char * argv[]) try
 
 	cfg.enable_stream(RS2_STREAM_DEPTH, DEPTH_INPUT_WIDTH, DEPTH_INPUT_HEIGHT, RS2_FORMAT_Z16, FRAMERATE);
 	cfg.enable_stream(RS2_STREAM_COLOR, COLOR_INPUT_WIDTH, COLOR_INPUT_HEIGHT, RS2_FORMAT_BGR8, FRAMERATE);
+	
+	//rs2::context ctx;
+
+	//rs2::device_list devices =  ctx.query_devices();
+
+	//std::cout << "found " << devices.size() << " devices" << std::endl;
+
+	
+
+	//ctx.get_device(843112072189); 
+		
+	//rs2::device & dev = *ctx.get_device("843112072189");
+
+	//cfg.enable_device("843112073861");	
+	//cfg.enable_device("843112072189");
+	
 
 	//std::cout << "config created .. " << std::endl;
 
